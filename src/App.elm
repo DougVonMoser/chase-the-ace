@@ -3,15 +3,17 @@ module App exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Http exposing (..)
+import Json.Decode as Decode
 
 
 type alias Model =
-    Int
+    String
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( 0, Cmd.none )
+    ( "Muffin", Cmd.none )
 
 
 
@@ -19,25 +21,30 @@ init =
 
 
 type Msg
-    = Inc
+    = Trigger
+    | NewWords (Result Http.Error String)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
     case message of
-        Inc ->
-            ( add1 model, Cmd.none )
+        Trigger ->
+            ( model, getThoseWords )
+        NewWords (Ok newWords)->
+            ( newWords, Cmd.none )
+        NewWords (Err _)->
+            ( model, Cmd.none )
 
 
-{-| increments the counter
-
-    add1 5 --> 6
-
--}
-add1 : Model -> Model
-add1 model =
-    model + 1
-
+getThoseWords : Cmd Msg
+getThoseWords =
+    let 
+        url =
+            "http://localhost:3001/"
+        request =
+            Http.getString url 
+    in 
+        Http.send NewWords request
 
 
 -- VIEW
@@ -46,22 +53,12 @@ add1 model =
 view : Model -> Html Msg
 view model =
     div [ class "container" ]
-        [ header []
-            [ img [ src "images/logo.png" ] []
-            , h1 [] [ text "Elm Webpack Starter, featuring hot-loading" ]
-            ]
-        , p [] [ text "Click on the button below to increment the state." ]
-        , div []
-            [ button
+        [ 
+           button
                 [ class "pure-button pure-button-primary"
-                , onClick Inc
+                , onClick Trigger
                 ]
-                [ text "+ 1" ]
-            , text <| toString model
-            ]
-        , p [] [ text "Then make a change to the source code and see how the state is retained after you recompile." ]
-        , p []
-            [ text "And now don't forget to add a star to the Github repo "
-            , a [ href "https://github.com/simonh1000/elm-webpack-starter" ] [ text "elm-webpack-starter" ]
-            ]
+                [ text "get stuff" ]
+                ,
+                text model
         ]
