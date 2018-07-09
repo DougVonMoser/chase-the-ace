@@ -31,7 +31,11 @@ update message model =
         Trigger ->
             ( model, getThoseWords )
         NewWords (Ok newWords)->
-            ( newWords, Cmd.none )
+            if newWords == model then
+                ( model, getThoseWords )
+            else
+                ( newWords, Cmd.none )
+
         NewWords (Err _)->
             ( model, Cmd.none )
 
@@ -42,7 +46,7 @@ getThoseWords =
         url =
             "http://localhost:3001/"
         request =
-            Http.getString url 
+            Http.get url Decode.string 
     in 
         Http.send NewWords request
 
