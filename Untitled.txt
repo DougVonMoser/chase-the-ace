@@ -1,0 +1,36 @@
+so step one, guess the model
+
+ill need a model at every point in the game.. obvi
+didnt i map this out?? lets grab that
+
+
+viewFunctions
+
+sittingDown
+    satDown and waiting (teams established)
+iNeedToDeal (big ol dealer button) (if dealer)
+iHaveCards (5 4 3 2 1)
+    myTurn
+    notMyTurn
+---- 
+cardsOnTheTable (whatever card just played)
+____    
+satDown and waiting.
+iNeedToDeal
+
+okay, what about screw your neighbor?
+that seems like a good intro
+each player (unlimited) is given a card.
+starting to the left of the dealer, you can hold or pass
+if you pass, the next player in line switches with you
+each player needs to hold the whole model
+
+
+dealRandom is a side effect
+
+scores: [] -- array length of players, each representing their score
+dealt: [] -- array length of the players
+playerIdx : Int -- index the current player sits in dealt array
+dealerIdx : Int -- index of the dealer, as sitting in dealt
+totalPlayer Int -- the total number of players, (maybe redundant)
+
