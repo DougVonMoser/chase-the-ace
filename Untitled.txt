@@ -26,7 +26,7 @@ if you pass, the next player in line switches with you
 each player needs to hold the whole model
 
 
-dealRandom is a side effect
+dealRandom is a side effect (that i will implement later)
 
 scores: [] -- array length of players, each representing their score
 dealt: [] -- array length of the players
@@ -34,3 +34,31 @@ playerIdx : Int -- index the current player sits in dealt array
 dealerIdx : Int -- index of the dealer, as sitting in dealt
 totalPlayer Int -- the total number of players, (maybe redundant)
 
+
+what if i refactored that the hand array was relative to the dealers left. hmmmmmm idk
+
+idk ^ 
+but
+should the update take in arguments from the onclick?
+should it be ignorant of that?
+
+if i just simply run the msg, without passing anything.. is that pure?
+yea, i gots to. and i dont necessarily have to hold the whole state in each client
+sure i pass out all the cards, but that each client only keeps its card
+i send off myIdx and card to socket. maybe i restrict, maybe i hide controls. idk
+but, yes. i need to update with who played it and what they played 
+
+
+do i update my model before websocketing it out?
+    if yes
+        then server tell everyone else but me. they do the same. no race condition.
+    if no
+        i WS, broadcast, and then i will have to trigger another broadcast. 
+        more moving parts
+
+
+
+i think i update my shit, then broadcast same update msg and payload to others
+
+
+im always subscribing to what the server says

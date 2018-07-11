@@ -3,40 +3,56 @@ module App exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-
+import Array exposing (..)
 
 type alias Model =
-    Int
+    {
+        scores: Array.Array (Int) -- array length of players, each representing their score
+        , dealt: Array.Array (Maybe String) -- array length of the players
+        , myIdx : Int -- index the current player sits in dealt array
+        , dealerIdx : Int -- index of the dealer, as sitting in dealt
+        , playerCount : Int -- the total number of players, (maybe redundant)
+        , turnIdx : Int
+    }
 
+initialModel : Model
+initialModel = 
+    {
+        scores = fromList [0,0,0,0]
+        , dealt = fromList [Just "12C", Just "9D", Just "8S", Just "3H"]
+        -- , dealt = fromList [Nothing, Nothing, Nothing, Nothing]
+        , myIdx = 1
+        , dealerIdx = 0
+        , playerCount = 4
+        , turnIdx = 1
+    }
 
 init : ( Model, Cmd Msg )
 init =
-    ( 0, Cmd.none )
+    ( initialModel, Cmd.none )
 
 
-
+-- 
 -- UPDATE
 
 
 type Msg
-    = Inc
-
+    = Deal -- regla ass command
+    | Stay Int -- myIdx
+    | Switch (Int, Maybe String) --myIdx and card
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
     case message of
-        Inc ->
-            ( add1 model, Cmd.none )
+        Deal ->
+            ( model, Cmd.none )
+        Stay myIdx->
+            (
+                {model | turnIdx = model.turnIdx + 1 % model.playerCount}, Cmd.none
+            )
+        _ ->
+            ( model, Cmd.none )
 
-
-{-| increments the counter
-
-    add1 5 --> 6
-
--}
-add1 : Model -> Model
-add1 model =
-    model + 1
 
 
 
@@ -45,23 +61,65 @@ add1 model =
 
 view : Model -> Html Msg
 view model =
-    div [ class "container" ]
-        [ header []
-            [ img [ src "images/logo.png" ] []
-            , h1 [] [ text "Elm Webpack Starter, featuring hot-loading" ]
-            ]
-        , p [] [ text "Click on the button below to increment the state." ]
-        , div []
-            [ button
-                [ class "pure-button pure-button-primary"
-                , onClick Inc
-                ]
-                [ text "+ 1" ]
-            , text <| toString model
-            ]
-        , p [] [ text "Then make a change to the source code and see how the state is retained after you recompile." ]
-        , p []
-            [ text "And now don't forget to add a star to the Github repo "
-            , a [ href "https://github.com/simonh1000/elm-webpack-starter" ] [ text "elm-webpack-starter" ]
-            ]
+    let myCard =
+        getIdx model.myIdx model.dealt
+    in
+        div [ class "container" ]
+            [ viewStatus model
+                , viewCard myCard
+                , viewPlayOptions model myCard]
+
+viewStatus : Model -> Html Msg
+viewStatus model =
+    let turnStatus =
+        if model.turnIdx == model.myIdx then
+            div [] [text "my turn!"]
+        else
+            div [] [text "waiting!"]
+    in
+        div [] [
+            turnStatus
+            , viewDealCommand model.myIdx model.dealerIdx model.dealt
         ]
+
+viewPlayOptions : Model -> Maybe String -> Html Msg
+viewPlayOptions model myCard=
+    div [] [
+        button [onClick (Stay model.myIdx) ] [text "Stay"]
+        , button [onClick (Switch (model.myIdx, myCard))] [text "Switch"]
+         
+    ]
+
+
+viewDealCommand : Int -> Int -> Array.Array (Maybe String) -> Html Msg
+viewDealCommand player dealer hands = 
+    let needsDealing =
+        List.all ( (==) Nothing ) (toList hands)
+    in
+        if player == dealer && needsDealing then
+            button [onClick Deal] [text "im da dealer"]
+        else if player == dealer then
+            text "my deal, but dealt"
+        else
+            text "not my deal"
+
+
+
+getIdx : Int -> Array.Array (Maybe a) -> Maybe a
+getIdx idx arr =
+    let thing = 
+        get idx arr
+    in
+        case thing of
+            Just val ->
+                val
+            Nothing ->
+                Nothing
+
+viewCard : Maybe String -> Html Msg
+viewCard cardValue = 
+    case cardValue of
+        Just card ->
+            text card
+        Nothing ->
+            text "aint no card yet"
