@@ -59,6 +59,8 @@ do i update my model before websocketing it out?
 
 
 i think i update my shit, then broadcast same update msg and payload to others
+yea. because each client has different states. so thats fine
+
 
 
 im always subscribing to what the server says

@@ -43,17 +43,16 @@ type Msg
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
-    case message of
-        Deal ->
-            ( model, Cmd.none )
-        Stay myIdx->
-            (
-                {model | turnIdx = model.turnIdx + 1 % model.playerCount}, Cmd.none
-            )
-        _ ->
-            ( model, Cmd.none )
-
-
+    if model.turnIdx == model.myIdx then
+        case message of
+            Deal ->
+                ( model, Cmd.none )
+            Stay myIdx->
+                    ({model | turnIdx = (model.turnIdx + 1) % model.playerCount}, Cmd.none)
+            _ ->
+                ( model, Cmd.none )
+    else
+        ( model, Cmd.none )
 
 
 -- VIEW
