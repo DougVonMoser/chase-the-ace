@@ -3,9 +3,8 @@ module App exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Http exposing (..)
-import Json.Decode as Decode
 import Array exposing (..)
+import WebSocket exposing (..)
 
 type alias Model =
     {
@@ -15,6 +14,7 @@ type alias Model =
         , dealerIdx : Int -- index of the dealer, as sitting in dealt
         , playerCount : Int -- the total number of players, (maybe redundant)
         , turnIdx : Int
+        , serverHeadsUp: String
     }
 
 initialModel : Model
@@ -27,6 +27,7 @@ initialModel =
         , dealerIdx = 0
         , playerCount = 4
         , turnIdx = 1
+        ,serverHeadsUp = "nohting yet"
     }
 
 init : ( Model, Cmd Msg )
@@ -34,7 +35,6 @@ init =
     ( initialModel, Cmd.none )
 
 
--- 
 -- UPDATE
 
 
@@ -42,6 +42,7 @@ type Msg
     = Deal -- regla ass command
     | Stay Int -- myIdx
     | Switch (Int, Maybe String) --myIdx and card
+    | Incoming String
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
@@ -50,11 +51,20 @@ update message model =
             Deal ->
                 ( model, Cmd.none )
             Stay myIdx->
-                    ({model | turnIdx = (model.turnIdx + 1) % model.playerCount}, Cmd.none)
+                ({model | turnIdx = (model.turnIdx + 1) % model.playerCount}, Cmd.none)
+            Incoming whatever->
+                ({model | serverHeadsUp = whatever}, Cmd.none)
             _ ->
                 ( model, Cmd.none )
     else
         ( model, Cmd.none )
+
+
+
+-- SUBSCRIPTIONS
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    WebSocket.listen "ws://localhost:8080" Incoming
 
 
 -- VIEW
@@ -66,7 +76,8 @@ view model =
         getIdx model.myIdx model.dealt
     in
         div [ class "container" ]
-            [ viewStatus model
+            [ text model.serverHeadsUp
+                , viewStatus model
                 , viewCard myCard
                 , viewPlayOptions model myCard]
 
@@ -109,7 +120,7 @@ viewDealCommand player dealer hands =
 getIdx : Int -> Array.Array (Maybe a) -> Maybe a
 getIdx idx arr =
     let thing = 
-        get idx arr
+        Array.get idx arr
     in
         case thing of
             Just val ->

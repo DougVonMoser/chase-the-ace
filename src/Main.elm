@@ -1,7 +1,7 @@
 module Main exposing (main)
 
 import Html
-import App exposing (init, update, view)
+import App exposing (init, update, view, subscriptions)
 
 
 main =
@@ -9,5 +9,5 @@ main =
         { init = init
         , update = update
         , view = view
-        , subscriptions = always Sub.none
+        , subscriptions = subscriptions
         }

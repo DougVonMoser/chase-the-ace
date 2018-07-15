@@ -1,13 +1,12 @@
-const express = require('express');
-const app = express();
-
-let words = "random friggin words man you dont know what youre gonna get".split(' ');
-
-
-app.get('/', (req, res) => {
-    let randy = Math.floor(Math.random() * 9);
-    let randomWord = words[randy];
-    return res.json(randomWord);
+const WebSocket = require('ws');
+ 
+const wss = new WebSocket.Server({ port: 8080 });
+ 
+wss.on('connection', function connection(ws) {
+    console.log('hello dare')
+    ws.on('message', function incoming(message) {
+        console.log('received: %s', message);
+    });
+ 
+    ws.send('something');
 });
-
-app.listen(3001, () => console.log('Example app listening on port 3001!'))
