@@ -3,6 +3,8 @@ module App exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Http exposing (..)
+import Json.Decode as Decode
 import Array exposing (..)
 
 type alias Model =

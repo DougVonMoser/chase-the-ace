@@ -6,8 +6,10 @@
     "main": "index.js",
     "scripts": {
         "test": "elm-verify-examples && elm-test",
-        "start": "npm run dev",
-        "dev": "webpack-serve --hot --port 3000 --colors",
+        "start": "npm run server & npm run static",
+        "static": "webpack-serve --hot --port 3000 --colors",
+        "server": "nodemon src/server/index.js",
+        "postserver": "pkill -f nodemon",
         "build": "webpack",
         "prod": "webpack -p",
         "postinstall": "elm-package install -y && elm-test init"
@@ -28,6 +30,7 @@
         "elm-hot-loader": "^0.5.4",
         "elm-verify-examples": "^2.3.1",
         "elm-webpack-loader": "^4.5.0",
+        "express": "^4.16.3",
         "file-loader": "^1.1.11",
         "html-webpack-plugin": "^3.2.0",
         "mini-css-extract-plugin": "^0.4.0",
