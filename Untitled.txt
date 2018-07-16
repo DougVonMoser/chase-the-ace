@@ -55,12 +55,26 @@ do i update my model before websocketing it out?
     if no
         i WS, broadcast, and then i will have to trigger another broadcast. 
         more moving parts
+        ^ incorrect assumption, maybe. 
+            if i broadcast what happened, each client could theoretically update their model in the same manne
+            no rebroadcasting, everyone ticks their next move the same way
 
 
 
-i think i update my shit, then broadcast same update msg and payload to others
-yea. because each client has different states. so thats fine
+
+what to broadcast
+{
+    playerIdx: Int
+    action: String
+    newCards: Array.Array Card
+}
+
+playerIdx: Int
+action: Stay | Switch (newCards)| Deal (newCards)
+newCards: Array.Array Card
 
 
+when a Cmd is ran after an update, thats given the updated model, right?
+yup, has to be. 
 
-im always subscribing to what the server says
+dynamically assign playerIds upon connection

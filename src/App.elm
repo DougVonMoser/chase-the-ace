@@ -5,6 +5,10 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Array exposing (..)
 import WebSocket exposing (..)
+import Json.Encode exposing (encode, object)  
+import Json.Decode exposing (..)  
+-- at, string, int, array, maybe-- dsf
+
 
 type alias Model =
     {
@@ -32,34 +36,130 @@ initialModel =
 
 init : ( Model, Cmd Msg )
 init =
+    -- need to ask for my playerId
     ( initialModel, Cmd.none )
 
 
 -- UPDATE
 
-
+-- may not use these anymore?
 type Msg
     = Deal -- regla ass command
-    | Stay Int -- myIdx
-    | Switch (Int, Maybe String) --myIdx and card
+    | Stay 
+    | Switch
     | Incoming String
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
     if model.turnIdx == model.myIdx then
-        case message of
-            Deal ->
-                ( model, Cmd.none )
-            Stay myIdx->
-                ({model | turnIdx = (model.turnIdx + 1) % model.playerCount}, Cmd.none)
-            Incoming whatever->
-                ({model | serverHeadsUp = whatever}, Cmd.none)
-            _ ->
-                ( model, Cmd.none )
+        let 
+            nextTurn = getNextTurn model.myIdx model.playerCount
+            maybeMyCard = getIdx model.myIdx model.dealt
+        in 
+            case message of
+                Deal ->
+                    ( model, Cmd.none )
+                Stay ->
+                    ( model, sendStay model.myIdx )
+                    -- ({model | turnIdx = (model.turnIdx + 1) % model.playerCount}, Cmd.none)
+                Switch -> 
+                    ( model, sendSwitch model.myIdx nextTurn maybeMyCard model.dealt )
+                Incoming payload ->
+                    (handleIncoming payload model, Cmd.none)
     else
         ( model, Cmd.none )
 
 
+sendSwitch : Int -> Int -> Maybe String -> Array.Array (Maybe String) -> Cmd msg
+sendSwitch myIdx nextTurn maybeMyCard dealt =
+    let
+        nextCard =
+            getIdx nextTurn dealt
+        updated = 
+            Array.set myIdx nextCard dealt
+        updatedAgain =
+            Array.set nextTurn maybeMyCard updated
+        gonnaSendThis = 
+            Json.Encode.object [
+                ("playerIdx", Json.Encode.int myIdx)
+                , ("move", Json.Encode.string "Switch")
+                -- shit, i need to stop using maybes in dealt. it fucks things up
+                , ("newCards", Json.Encode.array (Array.map dealtMapper updatedAgain) )
+            ]
+        jsonstringified = 
+            Json.Encode.encode 0 gonnaSendThis
+    in
+        send "ws://localhost:8080" jsonstringified
+
+dealtMapper : Maybe String -> Json.Encode.Value
+dealtMapper thing =
+    case thing of
+        Just val -> 
+            Json.Encode.string val
+        Nothing ->
+            Json.Encode.string "uh oh"
+
+sendStay : Int -> Cmd msg
+sendStay playerIdx = 
+    let 
+        gonnaSendThis = 
+            Json.Encode.object [
+                ("playerIdx", Json.Encode.int playerIdx)
+                , ("move", Json.Encode.string "Stay")
+                , ("newCards", Json.Encode.array  (fromList [Json.Encode.string "13C", Json.Encode.string "9D", Json.Encode.string "8S", Json.Encode.string "3H"]) )
+            ]
+        jsonstringified = 
+            Json.Encode.encode 0 gonnaSendThis
+    in
+        send "ws://localhost:8080" jsonstringified
+
+
+-- type Move = Stay | Switch | Deal -- maybe? 
+
+type alias PlayerAction = {
+    playerIdx : Int
+    , move : String --Move
+    , newCards : Array.Array String
+}
+
+
+playerActionDecoder : Decoder PlayerAction 
+playerActionDecoder =
+    Json.Decode.map3 PlayerAction
+        (at ["playerIdx"] int)
+        (at ["move"] string)
+        (at ["newCards"] ( array string ) )
+
+
+handleIncoming : String -> Model -> Model
+handleIncoming payload model =
+    let something = 
+        decodeString playerActionDecoder payload
+    in
+        case something of
+            Ok value ->
+                case value.move of
+                    "Stay" ->
+                        { model | 
+                            turnIdx = getNextTurn model.turnIdx model.playerCount
+                            , serverHeadsUp = "player " ++ toString model.turnIdx ++ " stayed!"
+                        }
+                    "Switch" ->
+                        { model |
+                            turnIdx = getNextTurn model.turnIdx model.playerCount
+                            , serverHeadsUp = "player " ++ toString model.turnIdx ++ " switched!"
+                            , dealt = Array.map Just value.newCards
+                        }
+                    _ ->
+                        { model | serverHeadsUp = value.move }
+
+            _ ->
+                { model | serverHeadsUp = "shit job decoding" }
+
+
+getNextTurn : Int -> Int -> Int
+getNextTurn current totalPlayers=
+    (current + 1) % totalPlayers
 
 -- SUBSCRIPTIONS
 subscriptions : Model -> Sub Msg
@@ -97,8 +197,8 @@ viewStatus model =
 viewPlayOptions : Model -> Maybe String -> Html Msg
 viewPlayOptions model myCard=
     div [] [
-        button [onClick (Stay model.myIdx) ] [text "Stay"]
-        , button [onClick (Switch (model.myIdx, myCard))] [text "Switch"]
+        button [onClick Stay ] [text "Stay"]
+        , button [onClick Switch ] [text "Switch"]
          
     ]
 
