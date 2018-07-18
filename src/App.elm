@@ -9,12 +9,13 @@ import Json.Encode exposing (encode, object)
 import Json.Decode exposing (..)  
 -- at, string, int, array, maybe-- dsf
 
+type Stage = SitDown | Play
 
 type alias Model =
     {
         scores: Array.Array (Int) -- array length of players, each representing their score
         , dealt: Array.Array (Maybe String) -- array length of the players
-        , myIdx : Int -- index the current player sits in dealt array
+        , myIdx : Maybe Int -- index the current player sits in dealt array
         , dealerIdx : Int -- index of the dealer, as sitting in dealt
         , playerCount : Int -- the total number of players, (maybe redundant)
         , turnIdx : Int
@@ -27,11 +28,11 @@ initialModel =
         scores = fromList [0,0,0,0]
         , dealt = fromList [Just "12C", Just "9D", Just "8S", Just "3H"]
         -- , dealt = fromList [Nothing, Nothing, Nothing, Nothing]
-        , myIdx = 1
+        , myIdx = Nothing
         , dealerIdx = 0
         , playerCount = 4
         , turnIdx = 1
-        ,serverHeadsUp = "nohting yet"
+        , serverHeadsUp = "nohting yet"
     }
 
 init : ( Model, Cmd Msg )
@@ -48,26 +49,47 @@ type Msg
     | Stay 
     | Switch
     | Incoming String
+    | SelectSeat String
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
-    if model.turnIdx == model.myIdx then
-        let 
-            nextTurn = getNextTurn model.myIdx model.playerCount
-            maybeMyCard = getIdx model.myIdx model.dealt
-        in 
-            case message of
-                Deal ->
+    case (message, model.myIdx) of
+        (_, Just myIdx) ->
+            -- this was dumb vv
+            let 
+                nextTurn = getNextTurn myIdx model.playerCount
+                maybeMyCard = getIdx myIdx model.dealt
+                allowedToSend = model.turnIdx == myIdx
+            in 
+                case message of
+                    Deal ->
+                        ( model, Cmd.none )
+                    Stay ->
+                        if allowedToSend then 
+                            ( model, sendStay myIdx )
+                        else 
+                            ( model, Cmd.none )
+                        -- ({model | turnIdx = (model.turnIdx + 1) % model.playerCount}, Cmd.none)
+                    Switch -> 
+                        if allowedToSend then 
+                            ( model, sendSwitch myIdx nextTurn maybeMyCard model.dealt )
+                        else 
+                            ( model, Cmd.none )
+                    Incoming payload ->
+                        (handleIncoming payload model, Cmd.none)
+                    _ ->
+                        ( model, Cmd.none )
+
+        (SelectSeat chosenSeatIdx, _) ->
+            case String.toInt chosenSeatIdx of
+                Ok gucci -> 
+                    ( { model | myIdx = Just gucci }, Cmd.none )
+                Err ljkasdjf->
                     ( model, Cmd.none )
-                Stay ->
-                    ( model, sendStay model.myIdx )
-                    -- ({model | turnIdx = (model.turnIdx + 1) % model.playerCount}, Cmd.none)
-                Switch -> 
-                    ( model, sendSwitch model.myIdx nextTurn maybeMyCard model.dealt )
-                Incoming payload ->
-                    (handleIncoming payload model, Cmd.none)
-    else
-        ( model, Cmd.none )
+        (_, Nothing) ->
+            ( model, Cmd.none )
+
+
 
 
 sendSwitch : Int -> Int -> Maybe String -> Array.Array (Maybe String) -> Cmd msg
@@ -151,7 +173,7 @@ handleIncoming payload model =
                             , dealt = Array.map Just value.newCards
                         }
                     _ ->
-                        { model | serverHeadsUp = value.move }
+                        { model | serverHeadsUp = "idk what the heck happened" }
 
             _ ->
                 { model | serverHeadsUp = "shit job decoding" }
@@ -172,26 +194,30 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
-    let myCard =
-        getIdx model.myIdx model.dealt
-    in
-        div [ class "container" ]
-            [ text model.serverHeadsUp
-                , viewStatus model
-                , viewCard myCard
-                , viewPlayOptions model myCard]
+    case model.myIdx of
+        Just myIdx ->
+            let myCard =
+                getIdx myIdx model.dealt
+            in
+                div [ class "container" ]
+                    [ text model.serverHeadsUp
+                        , viewStatus myIdx model
+                        , viewCard myCard
+                        , viewPlayOptions model myCard]
+        Nothing ->
+            input [onInput SelectSeat] []
 
-viewStatus : Model -> Html Msg
-viewStatus model =
+viewStatus : Int -> Model -> Html Msg
+viewStatus myIdx model =
     let turnStatus =
-        if model.turnIdx == model.myIdx then
+        if model.turnIdx == myIdx then
             div [] [text "my turn!"]
         else
             div [] [text "waiting!"]
     in
         div [] [
             turnStatus
-            , viewDealCommand model.myIdx model.dealerIdx model.dealt
+            , viewDealCommand myIdx model.dealerIdx model.dealt
         ]
 
 viewPlayOptions : Model -> Maybe String -> Html Msg
