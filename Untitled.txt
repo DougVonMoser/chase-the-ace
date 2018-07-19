@@ -78,3 +78,7 @@ when a Cmd is ran after an update, thats given the updated model, right?
 yup, has to be. 
 
 dynamically assign playerIds upon connection
+
+
+ahhh what if the array was a maybe, not the items in it
+because that is how it will work.
