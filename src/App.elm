@@ -13,7 +13,7 @@ type Stage = SitDown | Play
 
 type alias Model =
     {
-        scores: Array.Array (Int) -- array length of players, each representing their score
+        scores: Array.Array Int -- array length of players, each representing their score
         , dealt: Array.Array (Maybe String) -- array length of the players
         , myIdx : Maybe Int -- index the current player sits in dealt array
         , dealerIdx : Int -- index of the dealer, as sitting in dealt
@@ -26,8 +26,9 @@ initialModel : Model
 initialModel = 
     {
         scores = fromList [0,0,0,0]
-        , dealt = fromList [Just "12C", Just "9D", Just "8S", Just "3H"]
-        -- , dealt = fromList [Nothing, Nothing, Nothing, Nothing]
+        , dealt =  fromList [Just "12C",Just "9D",Just "8S",Just "3H"]
+        -- , dealt = Just ( fromList ["12C", "9D", "8S", "3H"] )
+        -- , dealt = Nothing
         , myIdx = Nothing
         , dealerIdx = 0
         , playerCount = 4
@@ -45,40 +46,35 @@ init =
 
 -- may not use these anymore?
 type Msg
-    = Deal -- regla ass command
-    | Stay 
-    | Switch
+    = Send Move
     | Incoming String
     | SelectSeat String
+
+type Move
+    = Stay
+    | Switch 
+    | Deal
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
     case (message, model.myIdx) of
-        (_, Just myIdx) ->
-            -- this was dumb vv
-            let 
-                nextTurn = getNextTurn myIdx model.playerCount
-                maybeMyCard = getIdx myIdx model.dealt
-                allowedToSend = model.turnIdx == myIdx
-            in 
-                case message of
-                    Deal ->
-                        ( model, Cmd.none )
-                    Stay ->
-                        if allowedToSend then 
+        (Incoming payload, _) -> 
+            (handleIncoming payload model, Cmd.none)
+        (Send move, Just myIdx) ->
+            if model.turnIdx == myIdx then
+                let 
+                    nextTurn = getNextTurn myIdx model.playerCount
+                    maybeMyCard = getIdx myIdx model.dealt
+                in 
+                    case move of
+                        Deal ->
+                            ( model, Cmd.none )
+                        Stay ->
                             ( model, sendStay myIdx )
-                        else 
-                            ( model, Cmd.none )
-                        -- ({model | turnIdx = (model.turnIdx + 1) % model.playerCount}, Cmd.none)
-                    Switch -> 
-                        if allowedToSend then 
+                        Switch -> 
                             ( model, sendSwitch myIdx nextTurn maybeMyCard model.dealt )
-                        else 
-                            ( model, Cmd.none )
-                    Incoming payload ->
-                        (handleIncoming payload model, Cmd.none)
-                    _ ->
-                        ( model, Cmd.none )
+            else 
+                ( model, Cmd.none )
 
         (SelectSeat chosenSeatIdx, _) ->
             case String.toInt chosenSeatIdx of
@@ -111,7 +107,7 @@ sendSwitch myIdx nextTurn maybeMyCard dealt =
         jsonstringified = 
             Json.Encode.encode 0 gonnaSendThis
     in
-        send "ws://localhost:8080" jsonstringified
+        sendStringToServer jsonstringified
 
 dealtMapper : Maybe String -> Json.Encode.Value
 dealtMapper thing =
@@ -133,8 +129,10 @@ sendStay playerIdx =
         jsonstringified = 
             Json.Encode.encode 0 gonnaSendThis
     in
-        send "ws://localhost:8080" jsonstringified
+        sendStringToServer jsonstringified
 
+sendStringToServer : String -> Cmd msg
+sendStringToServer = send "ws://localhost:8080"
 
 -- type Move = Stay | Switch | Deal -- maybe? 
 
@@ -176,7 +174,7 @@ handleIncoming payload model =
                         { model | serverHeadsUp = "idk what the heck happened" }
 
             _ ->
-                { model | serverHeadsUp = "shit job decoding" }
+                { model | serverHeadsUp = "shit job decoding doug" }
 
 
 getNextTurn : Int -> Int -> Int
@@ -223,8 +221,8 @@ viewStatus myIdx model =
 viewPlayOptions : Model -> Maybe String -> Html Msg
 viewPlayOptions model myCard=
     div [] [
-        button [onClick Stay ] [text "Stay"]
-        , button [onClick Switch ] [text "Switch"]
+        button [onClick (Send Stay) ] [text "Stay"]
+        , button [onClick (Send Switch) ] [text "Switch"]
          
     ]
 
@@ -235,7 +233,7 @@ viewDealCommand player dealer hands =
         List.all ( (==) Nothing ) (toList hands)
     in
         if player == dealer && needsDealing then
-            button [onClick Deal] [text "im da dealer"]
+            button [onClick (Send Deal)] [text "im da dealer"]
         else if player == dealer then
             text "my deal, but dealt"
         else
