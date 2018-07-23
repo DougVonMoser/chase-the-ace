@@ -13,9 +13,12 @@ type Stage = SitDown | Play
 
 type alias Model =
     {
-        scores: Array.Array Int -- array length of players, each representing their score
+        stage: Stage
+        -- scores: Array.Array Int -- array length of players, each representing their score
+        , players : Array.Array (String) --names of players! fun!
         , dealt: Array.Array (Maybe String) -- array length of the players
         , myIdx : Maybe Int -- index the current player sits in dealt array
+        , myName : Maybe String -- index the current player sits in dealt array
         , dealerIdx : Int -- index of the dealer, as sitting in dealt
         , playerCount : Int -- the total number of players, (maybe redundant)
         , turnIdx : Int
@@ -25,11 +28,15 @@ type alias Model =
 initialModel : Model
 initialModel = 
     {
-        scores = fromList [0,0,0,0]
-        , dealt =  fromList [Just "12C",Just "9D",Just "8S",Just "3H"]
+        stage = SitDown
+        -- scores = fromList [0,0,0,0]
+        , players = Array.empty
+        , dealt =  fromList [Nothing , Nothing , Nothing , Nothing ]
+        -- , dealt =  fromList [Just "12C",Just "9D",Just "8S",Just "3H"]
         -- , dealt = Just ( fromList ["12C", "9D", "8S", "3H"] )
         -- , dealt = Nothing
         , myIdx = Nothing
+        , myName = Nothing
         , dealerIdx = 0
         , playerCount = 4
         , turnIdx = 1
@@ -38,7 +45,6 @@ initialModel =
 
 init : ( Model, Cmd Msg )
 init =
-    -- need to ask for my playerId
     ( initialModel, Cmd.none )
 
 
@@ -48,7 +54,8 @@ init =
 type Msg
     = Send Move
     | Incoming String
-    | SelectSeat String
+    | TypingName String
+    | SelectSeat
 
 type Move
     = Stay
@@ -58,35 +65,61 @@ type Move
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
     case (message, model.myIdx) of
-        (Incoming payload, _) -> 
-            (handleIncoming payload model, Cmd.none)
+        (Incoming payload, _) ->
+            let ignoreMe = 
+                Debug.log payload 1
+            in
+                (handleIncoming payload model, Cmd.none)
         (Send move, Just myIdx) ->
-            if model.turnIdx == myIdx then
-                let 
-                    nextTurn = getNextTurn myIdx model.playerCount
-                    maybeMyCard = getIdx myIdx model.dealt
-                in 
-                    case move of
-                        Deal ->
-                            ( model, Cmd.none )
-                        Stay ->
-                            ( model, sendStay myIdx )
-                        Switch -> 
-                            ( model, sendSwitch myIdx nextTurn maybeMyCard model.dealt )
-            else 
-                ( model, Cmd.none )
+            let 
+                nextTurn = getNextTurn myIdx model.playerCount
+                maybeMyCard = getIdx myIdx model.dealt
+            in 
+                case move of
+                    Deal ->
+                        ( model, sendDeal model myIdx )
+                    Stay ->
+                        ( model, sendStay myIdx )
+                    Switch -> 
+                        ( model, sendSwitch myIdx nextTurn maybeMyCard model.dealt )
 
-        (SelectSeat chosenSeatIdx, _) ->
-            case String.toInt chosenSeatIdx of
-                Ok gucci -> 
-                    ( { model | myIdx = Just gucci }, Cmd.none )
-                Err ljkasdjf->
+        (TypingName typings, _) ->
+            ( { model | myName = Just typings }, Cmd.none )
+        (SelectSeat, _) ->
+            case model.myName of
+                Just playerName ->
+                    ( model, sendSeat playerName )
+                Nothing ->
                     ( model, Cmd.none )
         (_, Nothing) ->
             ( model, Cmd.none )
 
 
+sendDeal : Model -> Int -> Cmd msg
+sendDeal model myIdx =
+   let 
+        gonnaSendThis = 
+            Json.Encode.object [
+                ("playerIdx", Json.Encode.int myIdx)
+                , ("move", Json.Encode.string "Deal")
+                , ("newCards", Json.Encode.array  (fromList [Json.Encode.string "13C", Json.Encode.string "9D", Json.Encode.string "8S", Json.Encode.string "3H"]) )
+            ]
+        jsonstringified = 
+            Json.Encode.encode 0 gonnaSendThis
+    in
+        sendStringToServer jsonstringified
 
+sendSeat : String -> Cmd msg
+sendSeat playerName =
+    let gonnaSendThis = 
+        Json.Encode.object [
+            ("move", Json.Encode.string "NewPlayer")
+            , ("name", Json.Encode.string playerName)
+        ]
+        jsonstringified = 
+            Json.Encode.encode 0 gonnaSendThis
+    in
+        sendStringToServer jsonstringified
 
 sendSwitch : Int -> Int -> Maybe String -> Array.Array (Maybe String) -> Cmd msg
 sendSwitch myIdx nextTurn maybeMyCard dealt =
@@ -142,7 +175,6 @@ type alias PlayerAction = {
     , newCards : Array.Array String
 }
 
-
 playerActionDecoder : Decoder PlayerAction 
 playerActionDecoder =
     Json.Decode.map3 PlayerAction
@@ -151,30 +183,102 @@ playerActionDecoder =
         (at ["newCards"] ( array string ) )
 
 
+type alias MoveDecoder = {
+    move: String
+}
+
+playerMoveDecoder : Decoder MoveDecoder
+playerMoveDecoder =
+    Json.Decode.map MoveDecoder
+        (at ["move"] string)
+
+-- lets decode "move" property first. this fn should run for only select moves
 handleIncoming : String -> Model -> Model
 handleIncoming payload model =
-    let something = 
-        decodeString playerActionDecoder payload
-    in
-        case something of
-            Ok value ->
-                case value.move of
-                    "Stay" ->
-                        { model | 
-                            turnIdx = getNextTurn model.turnIdx model.playerCount
-                            , serverHeadsUp = "player " ++ toString model.turnIdx ++ " stayed!"
-                        }
-                    "Switch" ->
-                        { model |
-                            turnIdx = getNextTurn model.turnIdx model.playerCount
-                            , serverHeadsUp = "player " ++ toString model.turnIdx ++ " switched!"
-                            , dealt = Array.map Just value.newCards
-                        }
-                    _ ->
-                        { model | serverHeadsUp = "idk what the heck happened" }
 
+
+    let newMove = 
+            decodeString playerMoveDecoder payload
+    in 
+        case newMove of
+            Ok value ->  
+                case value.move of
+                    "NewPlayer" ->
+                        assignNewPlayer payload model
+                    _ -> 
+                        let something = 
+                            decodeString playerActionDecoder payload
+                        in
+                            case (something, model.myIdx) of
+                                (Ok value, Just myIdx) ->
+                                    let playerThatMoved = 
+                                        if (myIdx == value.playerIdx) then
+                                            "You"
+                                        else 
+                                            case Array.get value.playerIdx model.players of
+                                                Just player ->
+                                                    player ++ " "
+                                                Nothing -> 
+                                                    "Player " ++ toString value.playerIdx
+                                    in
+                                        case value.move of
+                                            "Stay" ->
+                                                { model | 
+                                                    turnIdx = getNextTurn model.turnIdx model.playerCount
+                                                    , serverHeadsUp = playerThatMoved ++ " stayed!"
+                                                }
+                                            "Switch" ->
+                                                { model |
+                                                    turnIdx = getNextTurn model.turnIdx model.playerCount
+                                                    , serverHeadsUp = playerThatMoved ++ " switched!"
+                                                    , dealt = Array.map Just value.newCards
+                                                }
+
+                                            "Deal" ->
+                                                { model | 
+                                                    -- dealt = fromList [Just "12C",Just "9D",Just "8S",Just "3H"]
+                                                    dealt = Array.map Just value.newCards
+                                                    , serverHeadsUp = playerThatMoved ++ " dealt!"
+                                                }
+                                            _ ->
+                                                { model | serverHeadsUp = "idk what the heck happened" }
+
+                                (_, _) ->
+                                    { model | serverHeadsUp = "shit job decoding doug" }
             _ ->
-                { model | serverHeadsUp = "shit job decoding doug" }
+                model 
+
+
+type alias PlayerDecoder = {
+    name : String
+}
+
+newPlayerDecoder : Decoder PlayerDecoder
+newPlayerDecoder =
+    Json.Decode.map PlayerDecoder
+        (at ["name"] string)
+
+assignNewPlayer : String -> Model -> Model
+assignNewPlayer payload model =
+    let newPlayer = 
+        decodeString newPlayerDecoder payload
+    in
+        case newPlayer of
+            Ok player ->
+                let newPlayersArr =
+                    Array.push player.name model.players 
+                in
+                    case model.myName of
+                        Just myName ->
+                            if player.name == myName then
+                                {model | myIdx = Just ((Array.length newPlayersArr) - 1)
+                                , players = newPlayersArr}
+                            else 
+                                {model | players = newPlayersArr}
+                        Nothing -> 
+                            {model | players = newPlayersArr}
+            _ ->
+                model
 
 
 getNextTurn : Int -> Int -> Int
@@ -196,14 +300,29 @@ view model =
         Just myIdx ->
             let myCard =
                 getIdx myIdx model.dealt
+                myTurn = 
+                model.turnIdx == myIdx 
             in
                 div [ class "container" ]
                     [ text model.serverHeadsUp
                         , viewStatus myIdx model
                         , viewCard myCard
-                        , viewPlayOptions model myCard]
+                        , viewPlayOptions myTurn]
         Nothing ->
-            input [onInput SelectSeat] []
+            div [] [
+                div [] [
+                    input [onInput TypingName] []
+                    , button [onClick SelectSeat ] [text "join"]
+                ]
+                , showCurrentPlayers model.players
+                
+            ]
+
+
+showCurrentPlayers : Array.Array (String) -> Html Msg
+showCurrentPlayers players =
+    ul [] (Array.toList (Array.map (\x -> li [] [text x]) players) ) 
+    
 
 viewStatus : Int -> Model -> Html Msg
 viewStatus myIdx model =
@@ -218,13 +337,17 @@ viewStatus myIdx model =
             , viewDealCommand myIdx model.dealerIdx model.dealt
         ]
 
-viewPlayOptions : Model -> Maybe String -> Html Msg
-viewPlayOptions model myCard=
-    div [] [
-        button [onClick (Send Stay) ] [text "Stay"]
-        , button [onClick (Send Switch) ] [text "Switch"]
-         
-    ]
+viewPlayOptions : Bool -> Html Msg
+viewPlayOptions myTurn =
+    if myTurn then 
+        div [] [
+            button [onClick (Send Stay) ] [text "Stay"]
+            , button [onClick (Send Switch) ] [text "Switch"]
+            
+        ] 
+    else
+        div [] []
+
 
 
 viewDealCommand : Int -> Int -> Array.Array (Maybe String) -> Html Msg

@@ -82,3 +82,29 @@ dynamically assign playerIds upon connection
 
 ahhh what if the array was a maybe, not the items in it
 because that is how it will work.
+
+okay, im sending poop right 
+
+think about model again, dealt should be a maybe.
+actually send real values
+figure out pregame seat selection and dealing process
+
+PREGAME BABY
+i dont need playercount, its redundant
+
+
+okay pregame:
+everyone types their name, confirms their name. 
+onsubmit, send it out. 
+onrecieve, add it, send it out? 
+what if only dealer sent things out.
+as in, whoever confirms first. theyre in charge. 
+dude submits a new entry, dealer 
+
+player 0 submits. since theyre typed name is equal to new name and players is empty, theyre dealer/incharge.
+    emit new players array. 
+player 1 submits. since player array aint empty, they wait for "executive" response. 
+
+
+
+(yea i guess thats open to a hole but what are the odds)

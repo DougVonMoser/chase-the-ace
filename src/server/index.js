@@ -10,9 +10,14 @@ wss.broadcast = function broadcast(data) {
     });
   };
 
+let getUpToSpeed = null;
 wss.on('connection', function connection(ws) {
+    if (getUpToSpeed){
+      ws.send(getUpToSpeed);
+    }
     console.log('hello dare')
     ws.on('message', function incoming(message) {
+        // getUpToSpeed = message;
         console.log(message)
         // ws.send(message)
         wss.broadcast(message);
