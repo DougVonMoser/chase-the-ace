@@ -1,0 +1,7 @@
+say we wanted to make impossible states impossible here. what could we do?
+
+i think immediately about some fields are Maybes, but dependent upon the same action.
+what if we wrapped all the behind a maybe
+
+
+maybe it makes sense to leave that as the game. make whole new module for sitting down
