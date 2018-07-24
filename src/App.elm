@@ -7,6 +7,8 @@ import Array exposing (..)
 import WebSocket exposing (..)
 import Json.Encode exposing (encode, object)
 import Json.Decode exposing (..)
+import Random
+import Cards exposing (Card, getFullShuffledDeck)
 
 
 -- at, string, int, array, maybe-- dsf
@@ -15,12 +17,6 @@ import Json.Decode exposing (..)
 type Stage
     = SitDown
     | Play
-
-
-type alias Card =
-    { suit : String
-    , number : Int
-    }
 
 
 type alias Model =
@@ -66,6 +62,7 @@ type Msg
     | Incoming String
     | TypingName String
     | SelectSeat
+    | RandomInt Int
 
 
 type Move
@@ -91,7 +88,7 @@ update message model =
             in
                 case move of
                     Deal ->
-                        ( model, sendDeal model.dealt myIdx )
+                        ( model, Random.generate RandomInt (Random.int Random.minInt Random.maxInt) )
 
                     Stay ->
                         ( model, sendStay myIdx model.dealt )
@@ -115,8 +112,30 @@ update message model =
                 Nothing ->
                     ( model, Cmd.none )
 
+        ( RandomInt randy, Just myIdx ) ->
+            let
+                newModel =
+                    addCardsToDealt model randy
+            in
+                ( newModel, sendDeal newModel.dealt myIdx )
+
         ( _, Nothing ) ->
             ( model, Cmd.none )
+
+
+addCardsToDealt : Model -> Int -> Model
+addCardsToDealt model randy =
+    let
+        fittyTwo =
+            Cards.getFullShuffledDeck randy
+
+        justEnough =
+            Array.slice 0 (Array.length model.players) fittyTwo
+
+        ignoreMe =
+            Debug.log (toString justEnough) 1
+    in
+        { model | dealt = justEnough }
 
 
 sendDeal : Array.Array Card -> Int -> Cmd msg
@@ -131,6 +150,9 @@ sendDeal dealt myIdx =
 
         jsonstringified =
             Json.Encode.encode 0 gonnaSendThis
+
+        ignoreMe =
+            Debug.log (toString dealt) 1
     in
         sendStringToServer jsonstringified
 
@@ -192,7 +214,14 @@ sendSwitch myIdx nextTurnIdx myCard dealt =
 
 decodeDealt : Array.Array Card -> Array.Array Json.Encode.Value
 decodeDealt dealt =
-    Array.map (\x -> Json.Encode.object [ ( "suit", Json.Encode.string x.suit ), ( "number", Json.Encode.int x.number ) ]) dealt
+    Array.map
+        (\x ->
+            Json.Encode.object
+                [ ( "suit", Json.Encode.string x.suit )
+                , ( "number", Json.Encode.int x.number )
+                ]
+        )
+        dealt
 
 
 sendStay : Int -> Array.Array Card -> Cmd msg
