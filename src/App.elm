@@ -11,9 +11,6 @@ import Random
 import Cards exposing (Card, getFullShuffledDeck)
 
 
--- at, string, int, array, maybe-- dsf
-
-
 type Stage
     = SitDown
     | Play
@@ -37,8 +34,6 @@ initialModel =
     { -- scores = fromList [0,0,0,0]
       players = Array.empty
     , dealt = Array.empty
-
-    -- , dealt = Just ( fromList ["12C", "9D", "8S", "3H"] )
     , myIdx = Nothing
     , myName = Nothing
     , dealerIdx = 0
@@ -412,19 +407,26 @@ view : Model -> Html Msg
 view model =
     case model.myIdx of
         Just myIdx ->
-            let
-                myCard =
-                    get myIdx model.dealt
-
-                myTurn =
-                    model.turnIdx == myIdx
-            in
-                div [ class "container" ]
-                    [ text model.serverHeadsUp
-                    , viewStatus myIdx model
-                    , viewCard myCard
-                    , viewPlayOptions myTurn
+            if Array.length model.dealt == 0 then
+                div []
+                    [ h4 [] [ text "Waiting to start home skillet" ]
+                    , viewDealCommand myIdx model.dealerIdx model.dealt
+                    , showCurrentPlayers model.players
                     ]
+            else
+                let
+                    myCard =
+                        get myIdx model.dealt
+
+                    myTurn =
+                        model.turnIdx == myIdx
+                in
+                    div [ class "container" ]
+                        [ text model.serverHeadsUp
+                        , viewStatus myIdx model
+                        , viewCard myCard
+                        , viewPlayOptions myTurn
+                        ]
 
         Nothing ->
             div []
@@ -444,16 +446,18 @@ showCurrentPlayers players =
 viewStatus : Int -> Model -> Html Msg
 viewStatus myIdx model =
     let
-        turnStatus =
+        status =
             if model.turnIdx == myIdx then
-                div [] [ text "my turn!" ]
+                "my turn"
             else
-                div [] [ text "waiting!" ]
+                case get model.turnIdx model.players of
+                    Just name ->
+                        "waiting on " ++ name
+
+                    Nothing ->
+                        "waiting"
     in
-        div []
-            [ turnStatus
-            , viewDealCommand myIdx model.dealerIdx model.dealt
-            ]
+        div [] [ text status ]
 
 
 viewPlayOptions : Bool -> Html Msg
@@ -474,11 +478,11 @@ viewDealCommand player dealer hands =
             Array.length hands == 0
     in
         if player == dealer && needsDealing then
-            button [ onClick (Send Deal) ] [ text "im da dealer" ]
-        else if player == dealer then
-            text "my deal, but dealt"
+            button [ onClick (Send Deal) ] [ text "lets get started!" ]
+            -- else if player == dealer then
+            --     text "my deal, but dealt"
         else
-            text "not my deal"
+            text ""
 
 
 getIdx : Int -> Array.Array (Maybe a) -> Maybe a
