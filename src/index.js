@@ -1,6 +1,8 @@
 'use strict';
 
 require("./styles.scss");
+import './assets/svg-cards.svg';
+
 
 var Elm = require('./Main');
 var app = Elm.Main.fullscreen();

@@ -86,9 +86,14 @@ update message model =
                         ( model, Random.generate RandomInt (Random.int Random.minInt Random.maxInt) )
 
                     Stay ->
+                        -- if myIdx == model.dealerIdx then
+                        -- end round
                         ( model, sendStay myIdx model.dealt )
 
                     Switch ->
+                        -- if myIdx == model.dealerIdx then
+                        -- grab from top card instead of next person
+                        -- end round
                         case get myIdx model.dealt of
                             Just myCard ->
                                 ( model, sendSwitch myIdx nextTurn myCard model.dealt )
@@ -420,12 +425,15 @@ view model =
 
                     myTurn =
                         model.turnIdx == myIdx
+
+                    myDeal =
+                        model.dealerIdx == myIdx
                 in
                     div [ class "container" ]
                         [ text model.serverHeadsUp
                         , viewStatus myIdx model
                         , viewCard myCard
-                        , viewPlayOptions myTurn
+                        , viewPlayOptions myTurn myDeal
                         ]
 
         Nothing ->
@@ -460,15 +468,23 @@ viewStatus myIdx model =
         div [] [ text status ]
 
 
-viewPlayOptions : Bool -> Html Msg
-viewPlayOptions myTurn =
-    if myTurn then
-        div []
-            [ button [ onClick (Send Stay) ] [ text "Stay" ]
-            , button [ onClick (Send Switch) ] [ text "Switch" ]
-            ]
-    else
-        div [] []
+viewPlayOptions : Bool -> Bool -> Html Msg
+viewPlayOptions myTurn myDeal =
+    case ( myTurn, myDeal ) of
+        ( True, True ) ->
+            div []
+                [ button [ onClick (Send Stay) ] [ text "Stay" ]
+                , button [ onClick (Send Switch) ] [ text "Switch with top card" ]
+                ]
+
+        ( True, False ) ->
+            div []
+                [ button [ onClick (Send Stay) ] [ text "Stay" ]
+                , button [ onClick (Send Switch) ] [ text "Switch" ]
+                ]
+
+        ( False, _ ) ->
+            div [] []
 
 
 viewDealCommand : Int -> Int -> Array.Array Card -> Html Msg
