@@ -9,6 +9,8 @@ import Json.Encode exposing (encode, object)
 import Json.Decode exposing (..)
 import Random
 import Cards exposing (Card, getFullShuffledDeck)
+import Svg exposing (..)
+import Svg.Attributes exposing (x, y, id, height, width)
 
 
 type Stage
@@ -23,7 +25,6 @@ type alias Model =
     , myIdx : Maybe Int -- index the current player sits in dealt array
     , myName : Maybe String -- index the current player sits in dealt array
     , dealerIdx : Int -- index of the dealer, as sitting in dealt
-    , playerCount : Int -- the total number of players, (maybe redundant)
     , turnIdx : Int
     , serverHeadsUp : String
     }
@@ -37,7 +38,6 @@ initialModel =
     , myIdx = Nothing
     , myName = Nothing
     , dealerIdx = 0
-    , playerCount = 4
     , turnIdx = 1
     , serverHeadsUp = "nohting yet"
     }
@@ -68,59 +68,63 @@ type Move
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
-    case ( message, model.myIdx ) of
-        ( Incoming payload, _ ) ->
-            let
-                ignoreMe =
-                    Debug.log payload 1
-            in
-                ( handleIncoming payload model, Cmd.none )
+    let
+        playerCount =
+            Array.length model.players
+    in
+        case ( message, model.myIdx ) of
+            ( Incoming payload, _ ) ->
+                let
+                    ignoreMe =
+                        Debug.log payload 1
+                in
+                    ( handleIncoming payload model playerCount, Cmd.none )
 
-        ( Send move, Just myIdx ) ->
-            let
-                nextTurn =
-                    getNextTurn myIdx model.playerCount
-            in
-                case move of
-                    Deal ->
-                        ( model, Random.generate RandomInt (Random.int Random.minInt Random.maxInt) )
+            ( Send move, Just myIdx ) ->
+                let
+                    nextTurn =
+                        getNextTurn myIdx playerCount
+                in
+                    case move of
+                        Deal ->
+                            ( model, Random.generate RandomInt (Random.int Random.minInt Random.maxInt) )
 
-                    Stay ->
-                        -- if myIdx == model.dealerIdx then
-                        -- end round
-                        ( model, sendStay myIdx model.dealt )
+                        Stay ->
+                            -- if myIdx == model.dealerIdx then
+                            -- end round
+                            ( model, sendStay myIdx model.dealt )
 
-                    Switch ->
-                        -- if myIdx == model.dealerIdx then
-                        -- grab from top card instead of next person
-                        -- end round
-                        case get myIdx model.dealt of
-                            Just myCard ->
-                                ( model, sendSwitch myIdx nextTurn myCard model.dealt )
+                        Switch ->
+                            -- if myIdx == model.dealerIdx then
+                            -- grab from top card instead of next person
+                            -- end round
+                            case get myIdx model.dealt of
+                                Just myCard ->
+                                    ( model, sendSwitch myIdx nextTurn myCard model.dealt )
 
-                            Nothing ->
-                                ( { model | serverHeadsUp = "error state?" }, Cmd.none )
+                                Nothing ->
+                                    ( { model | serverHeadsUp = "error state?" }, Cmd.none )
 
-        ( TypingName typings, _ ) ->
-            ( { model | myName = Just typings }, Cmd.none )
+            ( TypingName typings, _ ) ->
+                ( { model | myName = Just typings }, Cmd.none )
 
-        ( SelectSeat, _ ) ->
-            case model.myName of
-                Just playerName ->
-                    ( model, sendSeat playerName )
+            ( SelectSeat, _ ) ->
+                case model.myName of
+                    Just playerName ->
+                        ( model, sendSeat playerName )
 
-                Nothing ->
-                    ( model, Cmd.none )
+                    Nothing ->
+                        ( model, Cmd.none )
 
-        ( RandomInt randy, Just myIdx ) ->
-            let
-                newModel =
-                    addCardsToDealt model randy
-            in
-                ( newModel, sendDeal newModel.dealt myIdx )
+            ( RandomInt randy, Just myIdx ) ->
+                let
+                    newModel =
+                        addCardsToDealt model randy
+                in
+                    ( newModel, sendDeal newModel.dealt myIdx )
 
-        ( _, Nothing ) ->
-            ( model, Cmd.none )
+            ( _, Nothing ) ->
+                ( model, Cmd.none )
 
 
 addCardsToDealt : Model -> Int -> Model
@@ -196,6 +200,7 @@ sendSwitch myIdx nextTurnIdx myCard dealt =
                                         Json.Encode.object
                                             [ ( "suit", Json.Encode.string x.suit )
                                             , ( "number", Json.Encode.int x.number )
+                                            , ( "svgDisplayVal", Json.Encode.string x.svgDisplayVal )
                                             ]
                                     )
                                     updatedAgain
@@ -219,6 +224,7 @@ decodeDealt dealt =
             Json.Encode.object
                 [ ( "suit", Json.Encode.string x.suit )
                 , ( "number", Json.Encode.int x.number )
+                , ( "svgDisplayVal", Json.Encode.string x.svgDisplayVal )
                 ]
         )
         dealt
@@ -266,9 +272,10 @@ playerActionDecoder =
         (at [ "move" ] string)
         (at [ "newCards" ]
             (array
-                (Json.Decode.map2 Card
+                (Json.Decode.map3 Card
                     (at [ "suit" ] string)
                     (at [ "number" ] int)
+                    (at [ "svgDisplayVal" ] string)
                 )
             )
         )
@@ -289,8 +296,8 @@ playerMoveDecoder =
 -- lets decode "move" property first. this fn should run for only select moves
 
 
-handleIncoming : String -> Model -> Model
-handleIncoming payload model =
+handleIncoming : String -> Model -> Int -> Model
+handleIncoming payload model playerCount =
     let
         newMove =
             decodeString playerMoveDecoder payload
@@ -323,13 +330,13 @@ handleIncoming payload model =
                                         case value.move of
                                             "Stay" ->
                                                 { model
-                                                    | turnIdx = getNextTurn model.turnIdx model.playerCount
+                                                    | turnIdx = getNextTurn model.turnIdx playerCount
                                                     , serverHeadsUp = playerThatMoved ++ " stayed!"
                                                 }
 
                                             "Switch" ->
                                                 { model
-                                                    | turnIdx = getNextTurn model.turnIdx model.playerCount
+                                                    | turnIdx = getNextTurn model.turnIdx playerCount
                                                     , serverHeadsUp = playerThatMoved ++ " switched!"
                                                     , dealt = value.newCards
                                                 }
@@ -414,7 +421,7 @@ view model =
         Just myIdx ->
             if Array.length model.dealt == 0 then
                 div []
-                    [ h4 [] [ text "Waiting to start home skillet" ]
+                    [ h4 [] [ Html.text "Waiting to start home skillet" ]
                     , viewDealCommand myIdx model.dealerIdx model.dealt
                     , showCurrentPlayers model.players
                     ]
@@ -430,7 +437,7 @@ view model =
                         model.dealerIdx == myIdx
                 in
                     div [ class "container" ]
-                        [ text model.serverHeadsUp
+                        [ Html.text model.serverHeadsUp
                         , viewStatus myIdx model
                         , viewCard myCard
                         , viewPlayOptions myTurn myDeal
@@ -440,7 +447,7 @@ view model =
             div []
                 [ div []
                     [ input [ onInput TypingName ] []
-                    , button [ onClick SelectSeat ] [ text "join" ]
+                    , button [ onClick SelectSeat ] [ Html.text "join" ]
                     ]
                 , showCurrentPlayers model.players
                 ]
@@ -448,7 +455,7 @@ view model =
 
 showCurrentPlayers : Array.Array String -> Html Msg
 showCurrentPlayers players =
-    ul [] (Array.toList (Array.map (\x -> li [] [ text x ]) players))
+    ul [] (Array.toList (Array.map (\x -> li [] [ Html.text x ]) players))
 
 
 viewStatus : Int -> Model -> Html Msg
@@ -465,7 +472,7 @@ viewStatus myIdx model =
                     Nothing ->
                         "waiting"
     in
-        div [] [ text status ]
+        div [] [ Html.text status ]
 
 
 viewPlayOptions : Bool -> Bool -> Html Msg
@@ -473,14 +480,14 @@ viewPlayOptions myTurn myDeal =
     case ( myTurn, myDeal ) of
         ( True, True ) ->
             div []
-                [ button [ onClick (Send Stay) ] [ text "Stay" ]
-                , button [ onClick (Send Switch) ] [ text "Switch with top card" ]
+                [ button [ onClick (Send Stay) ] [ Html.text "Stay" ]
+                , button [ onClick (Send Switch) ] [ Html.text "Random" ]
                 ]
 
         ( True, False ) ->
             div []
-                [ button [ onClick (Send Stay) ] [ text "Stay" ]
-                , button [ onClick (Send Switch) ] [ text "Switch" ]
+                [ button [ onClick (Send Stay) ] [ Html.text "Stay" ]
+                , button [ onClick (Send Switch) ] [ Html.text "Switch" ]
                 ]
 
         ( False, _ ) ->
@@ -494,11 +501,11 @@ viewDealCommand player dealer hands =
             Array.length hands == 0
     in
         if player == dealer && needsDealing then
-            button [ onClick (Send Deal) ] [ text "lets get started!" ]
+            button [ onClick (Send Deal) ] [ Html.text "lets get started!" ]
             -- else if player == dealer then
-            --     text "my deal, but dealt"
+            --     Html.text "my deal, but dealt"
         else
-            text ""
+            Html.text ""
 
 
 getIdx : Int -> Array.Array (Maybe a) -> Maybe a
@@ -519,7 +526,14 @@ viewCard : Maybe Card -> Html Msg
 viewCard cardValue =
     case cardValue of
         Just card ->
-            text (card.suit ++ (toString card.number))
+            svg [ Svg.Attributes.height "245", Svg.Attributes.width "170" ]
+                [ use
+                    [ Svg.Attributes.xlinkHref ("#svg-cards_" ++ card.svgDisplayVal)
+                    , x "0"
+                    , y "0"
+                    ]
+                    []
+                ]
 
         Nothing ->
-            text "aint no card yet"
+            Html.text "aint no card yet"

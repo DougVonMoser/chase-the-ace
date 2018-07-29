@@ -1,7 +1,9 @@
 'use strict';
 
 require("./styles.scss");
-import './assets/svg-cards.svg';
+// import './assets/svg-cards.svg';
+import './assets/alerts.svg';
+import theFuck from '../node_modules/svg-cards/svg-cards.svg';
 
 
 var Elm = require('./Main');

@@ -8,6 +8,7 @@ import Random
 type alias Card =
     { suit : String
     , number : Int
+    , svgDisplayVal : String
     }
 
 
@@ -84,12 +85,27 @@ getFittyTwo : Array.Array Card
 getFittyTwo =
     let
         suits =
-            [ "hearts", "spades", "diamonds", "clubs" ]
+            [ "heart", "spade", "diamond", "club" ]
 
         numbers =
             (List.range 1 13)
+
+        displayValues =
+            List.append (List.map toString (List.range 1 11)) [ "jack", "queen", "king" ]
     in
-        List.map (\x -> List.map (\y -> { suit = x, number = y }) numbers) suits
+        List.map
+            (\x ->
+                List.map2
+                    (\num val ->
+                        { suit = x
+                        , number = num
+                        , svgDisplayVal = x ++ "_" ++ val
+                        }
+                    )
+                    numbers
+                    displayValues
+            )
+            suits
             |> List.concat
             |> Array.fromList
 
